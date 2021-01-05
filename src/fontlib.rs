@@ -31,7 +31,7 @@ pub mod fontlib{
     use smart_buffer;
     use smart_buffer::SmartBuffer;
     use psp::sys::{sceGuGetMemory, sceGuScissor, sceKernelDcacheWritebackAll, sceGuClutMode, sceGuTexMode, sceGuEnable, sceGuTexImage, sceGuTexFunc, sceGuTexEnvColor, sceGuTexOffset, sceGuTexWrap, sceGuTexFilter, sceGuClutLoad, ClutPixelFormat, GuState, TexturePixelFormat, MipmapLevel, TextureEffect, TextureColorComponent, GuTexWrapMode, TextureFilter, sceKernelDcacheWritebackRange, sceGuDisable, sceGuDrawArray, GuPrimitive, VertexType};
-    use psp::sys::{DisplayPixelFormat}
+    use psp::sys::{DisplayPixelFormat};
     use psp::Align16;
 
 
