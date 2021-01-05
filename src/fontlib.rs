@@ -147,7 +147,7 @@ pub mod fontlib{
 
             let filetype = if header.pgf_id == ['P','G','F','0']{ // could probably be more robust
                 FileType::PGF
-            } else if header.len() == 1023372{
+            } else if data.len() == 1023372{
                 FileType::BWFON
             } else{
                 panic!("PSP-FONT: File provided is an unsupported format");
