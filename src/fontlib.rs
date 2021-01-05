@@ -8,8 +8,6 @@ mod rotation;
 pub mod helper;
 
 pub mod fontlib{
-    #[allow(unused_imports)]
-    use micromath::F32Ext;
     use crate::fontlib::ccclib::Codepages as CP;
     use core::fmt::Error;
     use byteorder::{LittleEndian, ByteOrder};
@@ -767,7 +765,7 @@ pub mod fontlib{
             self.color = style.color;
             self.shadow_color = style.shadow_color;
             let tolerance =  0.0078125f32; // 1/(2^7)
-            let diff = if self.rotation.angle > self.angle { self.rotation.angle - style.angle} else { style.angle - self.rotation.angle };
+            let diff = if self.rotation.angle > style.angle { self.rotation.angle - style.angle } else { style.angle - self.rotation.angle };
             if diff > tolerance{ // avoid recomputations
                 self.rotation.angle = style.angle;
                 if self.rotation.angle == 0.0{

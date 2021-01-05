@@ -7,3 +7,5 @@ The original intraFont library was made by BenHur on http://www.psp-programming.
 The intraFont library that made this possible was a fork by mrneo240 on https://gitlab.com/HaydenKow/libintrafont
 
 #### Currently, psp-font only supports PGF font files that are provided by the developer.
+
+### psp-font is currently under very heavy development.
