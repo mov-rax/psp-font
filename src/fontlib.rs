@@ -150,7 +150,7 @@ pub mod fontlib{
             } else if data.len() == 1023372{
                 FileType::BWFON
             } else{
-                panic!("PSP-FONT: File provided is an unsupported format");
+                panic!("PSP-FONT: File provided is an unsupported format -> {:?}", header.pgf_id); // now prints what the ID is
             };
 
             let mut font = match filetype{
