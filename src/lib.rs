@@ -1,15 +1,21 @@
-// #![no_std]
+#![no_std]
 #![feature(min_const_generics)]
+#[macro_use]
 extern crate alloc;
 #[macro_use]
 extern crate bitflags;
-use arrayvec;
+#[macro_use]
+extern crate smart_buffer;
+
 mod fontlib;
+
 
 #[cfg(test)]
 mod tests {
-    use arrayvec::ArrayVec;
-    use crate::fontlib::fontlib::PGFHeader;
+    use crate::fontlib::fontlib::{PGFHeader, Font};
+    use alloc::vec::Vec;
+    use crate::fontlib::style::{FontStyle, FontColor};
+    use crate::fontlib::helper::PGFFlags;
 
     struct Omega{
         a: u32,
@@ -19,9 +25,17 @@ mod tests {
 
     #[test]
     fn it_works() {
-        assert_eq!(2 + 2, 4);
-        let mut x = ArrayVec::<[u8;384]>::new();
-        x.push(3);
-        println!("{}", std::mem::size_of::<PGFHeader>())
+        // let data = include_bytes!("../ltn0.pgf");
+        // let mut font = Font::new(data, PGFFlags::CACHE_ASCII);
+        // font.set_style(FontStyle{
+        //     size: 23.0,
+        //     color: FontColor::RED,
+        //     shadow_color: FontColor::BLACK,
+        //     angle: 15.0,
+        //     options: PGFFlags::NONE,
+        // });
+        // //font.options.insert(PGFFlags::SCROLL_LEFT);
+        // font.print(0.0,0.0,"Hello There");
+
     }
 }

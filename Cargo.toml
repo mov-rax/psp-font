@@ -1,19 +1,20 @@
 [package]
 name = "psp-font"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["mov-rax <csharper.work@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#psp = "0.1.2"
+psp = "0.1.3"
 bitflags = "1.2.1"
-
-[dependencies.arrayvec]
-version = "0.5.2"
-default-features = false
+micromath = "1.1.0"
 
 [dependencies.byteorder]
 version = "1.3.4"
 default-features = false
+
+
+[dependencies.smart_buffer]
+git = "https://github.com/mov-rax/smart_buffer"
