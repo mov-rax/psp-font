@@ -1413,8 +1413,7 @@ pub mod fontlib{
 
     // TODO: cosf vs cosf32? which makes intrinsics::cosf32 work?
     #[allow(non_snake_case)]
-    #[no_mangle]
-    pub unsafe extern "C" fn cosf32(rad: f32) -> f32 {
+    pub unsafe fn cosf32(rad: f32) -> f32 {
         let out;
 
         vfpu_asm!(
