@@ -7,7 +7,7 @@ extern crate bitflags;
 #[macro_use]
 extern crate smart_buffer;
 
-mod fontlib;
+pub mod fontlib;
 
 
 #[cfg(test)]
