@@ -145,13 +145,10 @@ pub mod fontlib{
             }
             let header = header.unwrap();
 
-            psp::dprintln!("P: {:X}", header.pgf_id[0] as u32);
-            psp::dprintln!("G: {:X}", header.pgf_id[1] as u32);
-            psp::dprintln!("F: {:X}", header.pgf_id[2] as u32);
-            psp::dprintln!("0: {:X}", header.pgf_id[3] as u32);
+            let pgf_id = header.pgf_id.iter().collect::<String>();
+            psp::dprintln!("{}", &pgf_id);
 
-
-            let filetype = if header.pgf_id == ['P','G','F','0']{ // could probably be more robust
+            let filetype = if pgf_id == "PGF0"{ // could probably be more robust
                 FileType::PGF
             } else if data.len() == 1023372{
                 FileType::BWFON
