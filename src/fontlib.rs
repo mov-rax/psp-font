@@ -803,7 +803,8 @@ pub mod fontlib{
             }
 
             if column >= 0.0{
-                self.print_column_ucs2_ex(x,y,column,buffer, 0, buffer.get_size());
+                let length = buffer.get_size();
+                self.print_column_ucs2_ex(x,y,column,buffer, 0, length);
             } else {
 
             }
@@ -1016,8 +1017,8 @@ pub mod fontlib{
                                     _ => {}
                                 }
                                 // NEXT
-                                ux.i += 1;
                                 unsafe {
+                                    ux.i += 1
                                     x = ux.f;
                                     sceGuEnable(GuState::ScissorTest)
                                 }
