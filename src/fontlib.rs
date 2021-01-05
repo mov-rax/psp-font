@@ -1018,9 +1018,9 @@ pub mod fontlib{
                                 }
                                 // NEXT
                                 unsafe {
-                                    ux.i += 1
+                                    ux.i += 1;
                                     x = ux.f;
-                                    sceGuEnable(GuState::ScissorTest)
+                                    sceGuEnable(GuState::ScissorTest);
                                 }
                             }
 
