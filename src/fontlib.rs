@@ -145,10 +145,10 @@ pub mod fontlib{
             }
             let header = header.unwrap();
 
-            psp::dprintln!("P: {:x}", header.pgf_id[0]);
-            psp::dprintln!("G: {:x}", header.pgf_id[1]);
-            psp::dprintln!("F: {:x}", header.pgf_id[2]);
-            psp::dprintln!("0: {:x}", header.pgf_id[3]);
+            psp::dprintln!("P: {:X}", header.pgf_id[0] as u32);
+            psp::dprintln!("G: {:X}", header.pgf_id[1] as u32);
+            psp::dprintln!("F: {:X}", header.pgf_id[2] as u32);
+            psp::dprintln!("0: {:X}", header.pgf_id[3] as u32);
 
 
             let filetype = if header.pgf_id == ['P','G','F','0']{ // could probably be more robust
