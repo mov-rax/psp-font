@@ -1233,7 +1233,7 @@ pub mod fontlib{
                         xl = left + width + self.shadow_glyphs[shadow_glyph_ptr as usize].left as f32 * glyph_scale * 64.0 / (self.shadow_scale as f32);
                         xr = xl + self.shadow_glyphs[shadow_glyph_ptr as usize].width as f32 * 64.0 / (self.shadow_scale as f32);
                         yu = top + height - self.shadow_glyphs[shadow_glyph_ptr as usize].top as f32 * glyph_scale * 64.0 / (self.shadow_scale as f32);
-                        yd = yu + self.shadow_glyphs[shadow_glyph_ptr as usize].height as f32 * glyph_scale * 64.0 / (self.scale_scale as f32);
+                        yd = yu + self.shadow_glyphs[shadow_glyph_ptr as usize].height as f32 * glyph_scale * 64.0 / (self.shadow_scale as f32);
                         // Tex coords
                         ul = self.shadow_glyphs[shadow_glyph_ptr as usize].x as f32 - 0.25;
                         ur = self.shadow_glyphs[shadow_glyph_ptr as usize].x as f32 + self.shadow_glyphs[shadow_glyph_ptr as usize].width as f32 + 0.25;
