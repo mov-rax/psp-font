@@ -6,6 +6,8 @@ extern crate alloc;
 extern crate bitflags;
 #[macro_use]
 extern crate smart_buffer;
+#[macro_use]
+extern crate psp;
 
 pub mod fontlib;
 
@@ -25,6 +27,7 @@ mod tests {
 
     #[test]
     fn it_works() {
+
         // let data = include_bytes!("../ltn0.pgf");
         // let mut font = Font::new(data, PGFFlags::CACHE_ASCII);
         // font.set_style(FontStyle{

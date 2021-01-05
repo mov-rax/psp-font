@@ -33,6 +33,7 @@ pub mod fontlib{
     use psp::sys::{sceGuGetMemory, sceGuScissor, sceKernelDcacheWritebackAll, sceGuClutMode, sceGuTexMode, sceGuEnable, sceGuTexImage, sceGuTexFunc, sceGuTexEnvColor, sceGuTexOffset, sceGuTexWrap, sceGuTexFilter, sceGuClutLoad, ClutPixelFormat, GuState, TexturePixelFormat, MipmapLevel, TextureEffect, TextureColorComponent, GuTexWrapMode, TextureFilter, sceKernelDcacheWritebackRange, sceGuDisable, sceGuDrawArray, GuPrimitive, VertexType};
     use psp::sys::{DisplayPixelFormat};
     use psp::Align16;
+    use psp::sys::vfpu_context::MatrixSet;
 
 
     static mut CLUT: Align16<u16> = Align16(0); // Color Lookup Table
@@ -766,15 +767,15 @@ pub mod fontlib{
             self.color = style.color;
             self.shadow_color = style.shadow_color;
             let tolerance =  0.0078125f32; // 1/(2^7)
-            let diff = (self.rotation.angle - style.angle).abs();
+            let diff = if self.rotation.angle > self.angle { self.rotation.angle - style.angle} else { style.angle - self.rotation.angle };
             if diff > tolerance{ // avoid recomputations
                 self.rotation.angle = style.angle;
                 if self.rotation.angle == 0.0{
                     self.rotation.sin = 0.0;
                     self.rotation.cos = 1.0;
                 } else {
-                    self.rotation.sin = (style.angle * PI / 180.0).sin();
-                    self.rotation.cos = (style.angle * PI / 180.0).cos();
+                    self.rotation.sin = unsafe { cosf32(style.angle * PI / 180.0 + PI)};
+                    self.rotation.cos = unsafe { cosf32(style.angle * PI / 180.0)};
                 }
                 self.rotation.is_rotated = !(self.rotation.sin == 0.0 && self.rotation.cos == 1.0);
             }
@@ -1410,5 +1411,34 @@ pub mod fontlib{
             }
         }
 
+    }
+
+    // TODO: cosf vs cosf32? which makes intrinsics::cosf32 work?
+    #[allow(non_snake_case)]
+    #[no_mangle]
+    pub unsafe extern "C" fn cosf32(rad: f32) -> f32 {
+        let out;
+
+        vfpu_asm!(
+        .mips "mfc1 $$t0, $1";
+
+        mfv t1, S000;
+        mfv t2, S001;
+
+        mtv t0, S000;
+        vcst_s S001, VFPU_2_PI;
+        vmul_s S000, S000, S001;
+        vcos_s S000, S000;
+        mfv t0, S000;
+
+        mtv t1, S000;
+        mtv t2, S001;
+
+        .mips "mtc1 $$t0, $0";
+
+        : "=f"(out) : "f"(rad) : "$8", "$9", "$10", "memory" : "volatile"
+    );
+
+        out
     }
 }
