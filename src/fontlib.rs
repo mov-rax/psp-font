@@ -65,8 +65,8 @@ pub mod fontlib{
     #[feature(min_const_generics)]
     impl PGFHeader{
         const HEADER_SIZE:usize = 0x184; // 388 bytes in length
-        pub fn load_from_bytes<const N:usize>(file:&[u8;N]) -> Result<PGFHeader, Error>{ // Uses fmt::Error due to no std being present
-            if N < Self::HEADER_SIZE{ // the file must be invalid if it not large enough for a header
+        pub fn load_from_bytes(file:&Vec<u8>) -> Result<PGFHeader, Error>{ // Uses fmt::Error due to no std being present
+            if file.len() < Self::HEADER_SIZE{ // the file must be invalid if it not large enough for a header
                 return Err(Error)
             }
             let header_start= LittleEndian::read_u16(&file[0..=1]);
@@ -138,19 +138,19 @@ pub mod fontlib{
     }
 
     impl<'a> Font<'a>{
-        pub fn new<const N:usize>(data:&[u8;N], options: PGFFlags) -> Font{
+        pub fn new(data:&Vec<u8>, options: PGFFlags) -> Font{
             let header = PGFHeader::load_from_bytes(data);
             if let Err(_) = &header{
-                panic!("PGF Header of font file is invalid.");
+                panic!("PSP-FONT: PGF Header of font file is invalid.");
             }
             let header = header.unwrap();
 
             let filetype = if header.pgf_id == ['P','G','F','0']{ // could probably be more robust
                 FileType::PGF
-            } else if N == 1023372{
+            } else if header.len() == 1023372{
                 FileType::BWFON
             } else{
-                panic!("File provided is an unsupported format");
+                panic!("PSP-FONT: File provided is an unsupported format");
             };
 
             let mut font = match filetype{
