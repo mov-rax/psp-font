@@ -514,7 +514,7 @@ pub mod fontlib{
             // Swizzle texture
             unsafe {sceKernelDcacheWritebackAll();}
             self.swizzle();
-            unsafe {sceKernelDcacheWritebackAll():}
+            unsafe {sceKernelDcacheWritebackAll()};
 
             self.activate();
             if ac{
@@ -817,10 +817,10 @@ pub mod fontlib{
             let mut x = 0.0f32;
 
             for i in 0..length{
-                if text[i+offset] == '\n' as u16{
+                if text[i as usize +offset] == '\n' as u16{
                     break;
                 }
-                let char_id = self.get_char_id(text[i+offset]);
+                let char_id = self.get_char_id(text[i as usize +offset]);
                 if char_id < self.n_chars{
                     let glyph_ptr = if self.filetype == FileType::PGF { char_id } else { 0 } as usize;
                     x += if self.options.contains(PGFFlags::WIDTH_FIX) {
@@ -955,7 +955,7 @@ pub mod fontlib{
             }
             // Now comes a lot of psp-specific code.
             // This is a pointer to GPU memory. It is very nice for storing data that has to be displayed on screens :).
-            let mut v = unsafe { (sceGuGetMemory(if self.rotation.is_rotated { 6 } else { 2 } * n_sglyphs as i32 * n_sglyphs * size_of::<FontVertex>()) as *mut FontVertex)};
+            let mut v = unsafe { (sceGuGetMemory(if self.rotation.is_rotated { 6 } else { 2 } * (n_glyphs as i32 + n_sglyphs as i32) * size_of::<FontVertex>() as i32) as *mut FontVertex)};
 
             let mut s_index = 0;
             let mut c_index = n_sglyphs;
@@ -970,10 +970,10 @@ pub mod fontlib{
                             eol = length as i32;
                             scroll = 1;
                             left = (x as i32) as f32;
-                            #[derive(Default)]
+
                             union Union { i: i32, f: f32, };
-                            let mut ux = Union::default();
-                            let mut uleft = Union::default();
+                            let mut ux = Union { i: 0};
+                            let mut uleft = Union {i: 0};
                             ux.f = x;
                             uleft.f = left;
                             count = unsafe {ux.i - uleft.i} as usize;
@@ -981,20 +981,20 @@ pub mod fontlib{
                             if text_width as f32 > column{
                                 match self.options & PGFFlags::SCROLL_MASK{
                                     PGFFlags::SCROLL_LEFT => {
-                                        unsafe {sceGuScissor((left - 2) as i32, 0, (left + column + 4.0) as i32 , 274)};
+                                        unsafe {sceGuScissor((left - 2.0) as i32, 0, (left + column + 4.0) as i32 , 274)};
                                         if count < 60 {
                                             // show initial text for 1s
                                         } else if count < (text_width + 90) as usize{
                                             left -= count as f32 - 60.0;
                                         } else if count < (text_width + 120) as usize{
                                             color = FontColor::from_bits((color.bits() & 0x00FFFFFF) | ((((color.bits() >> 24) * (count as u32 - text_width as u32 - 90)) / 30) << 24)).unwrap();
-                                            shadow_color = FontColor::from_bits((shadow_color.bits() & 0x00FFFFFF) | ((((shadow_color >> 24) * (count as u32 - text_width as u32 - 90)) / 30) << 24)).unwrap();
+                                            shadow_color = FontColor::from_bits((shadow_color.bits() & 0x00FFFFFF) | ((((shadow_color.bits() >> 24) * (count as u32 - text_width as u32 - 90)) / 30) << 24)).unwrap();
                                         } else {
                                             ux.f = left; // reset counter
                                         }
                                     },
                                     PGFFlags::SCROLL_SEESAW => {
-                                        unsafe {sceGuScissor((left - column/2 - 2) as i32, 0, (left + column + 4.0) as i32, 272)};
+                                        unsafe {sceGuScissor((left - column/2.0 - 2.0) as i32, 0, (left + column + 4.0) as i32, 272)};
                                         text_width -= column as i32;
                                         if count < 60{
                                             left -= column/2.0; // show initial text (left side) for 1s
@@ -1061,7 +1061,7 @@ pub mod fontlib{
                                 left -= self.measure_text_ucs2_ex(&text, i+offset, eol - 1);
                             }
                             if (self.options & PGFFlags::ALIGN_MASK) == PGFFlags::ALIGN_CENTER{
-                                left -= self.measure_text_ucs2_ex(&text, i+offset, eol - i) / 2.0;
+                                left -= self.measure_text_ucs2_ex(&text, i+offset, eol - i as i32) / 2.0;
                             }
                         }
 
@@ -1103,7 +1103,7 @@ pub mod fontlib{
                     for mut j in 0..3{
                         if self.filetype == FileType::PGF{
                             if (self.glyphs[char_id].flags & PGFFlags::BMP_OVERLAY) == PGFFlags::BMP_OVERLAY{
-                                subucs2 = (self.font_data[(self.glyphs[char_id].offset + j as u32 * 2) as usize] as u32 + self.font_data[self.glyphs[char_id].offset + j as u32 * 2 + 1] as u32 * 256) as u16;
+                                subucs2 = (self.font_data[(self.glyphs[char_id].offset + j as u32 * 2) as usize] as u32 + self.font_data[(self.glyphs[char_id].offset + j as u32 * 2 + 1) as usize] as u32 * 256) as u16;
                                 glyph_id = self.get_char_id(subucs2 as u16)
                             } else {
                                 glyph_id = char_id as u16;
@@ -1136,11 +1136,11 @@ pub mod fontlib{
                                 unsafe { // Unsafety is our no. 1 priority
                                     v0 = Some(v.offset((c_index * 6) as isize));
 
-                                    v1 = Some(v0.unwrap().get_mut_ptr().offset(1));
-                                    v2 = Some(v1.unwrap().get_mut_ptr().offset(1));
-                                    v3 = Some(v2.unwrap().get_mut_ptr().offset(1));
-                                    v4 = Some(v3.unwrap().get_mut_ptr().offset(1));
-                                    v5 = Some(v4.unwrap().get_mut_ptr().offset(1));
+                                    v1 = Some(v0.unwrap().offset(1));
+                                    v2 = Some(v1.unwrap().offset(1));
+                                    v3 = Some(v2.unwrap().offset(1));
+                                    v4 = Some(v3.unwrap().offset(1));
+                                    v5 = Some(v4.unwrap().offset(1));
                                 }
 
                                 // But lots of times, safety is pretty nice.
@@ -1233,7 +1233,7 @@ pub mod fontlib{
                         xl = left + width + self.shadow_glyphs[shadow_glyph_ptr as usize].left as f32 * glyph_scale * 64.0 / (self.shadow_scale as f32);
                         xr = xl + self.shadow_glyphs[shadow_glyph_ptr as usize].width as f32 * 64.0 / (self.shadow_scale as f32);
                         yu = top + height - self.shadow_glyphs[shadow_glyph_ptr as usize].top as f32 * glyph_scale * 64.0 / (self.shadow_scale as f32);
-                        yd = yu + self.shadow_glyphs[shadow_glyph_ptr as usize].height f32 * glyph_scale * 64.0 / (self.scale_scale as f32);
+                        yd = yu + self.shadow_glyphs[shadow_glyph_ptr as usize].height as f32 * glyph_scale * 64.0 / (self.scale_scale as f32);
                         // Tex coords
                         ul = self.shadow_glyphs[shadow_glyph_ptr as usize].x as f32 - 0.25;
                         ur = self.shadow_glyphs[shadow_glyph_ptr as usize].x as f32 + self.shadow_glyphs[shadow_glyph_ptr as usize].width as f32 + 0.25;
@@ -1354,7 +1354,7 @@ pub mod fontlib{
 
             // finalize and activate texture (if not already active or ahs been changed)
             unsafe {
-                sceKernelDcacheWritebackRange(v as *mut _, (n_glyphs + n_sglyphs) as u32 * size_of::<FontVertex>()); // SAKYA, mrneo240 <-- from C version Intrafont
+                sceKernelDcacheWritebackRange(v as *mut _, (n_glyphs + n_sglyphs) as u32 * size_of::<FontVertex>() as u32); // SAKYA, mrneo240 <-- from C version Intrafont
                 if !self.options.contains(PGFFlags::ACTIVE){
                     self.activate(); // And then, there was light...
                 }
@@ -1364,7 +1364,7 @@ pub mod fontlib{
                                VertexType::TEXTURE_32BITF | VertexType::COLOR_8888 | VertexType::TRANSFORM_2D,
                                n_glyphs as i32 * if self.rotation.is_rotated { 6 } else { 2 },
                                core::ptr::null(),
-                               v.offset((n_sglyphs as u32 * if self.rotation.is_rotated { 6 } else { 2 }) as isize) as *mut _ )
+                               v.offset((n_sglyphs as u32 * if self.rotation.is_rotated { 6 } else { 2 }) as isize) as *mut _ );
                 sceGuEnable(GuState::DepthTest);
             }
 
