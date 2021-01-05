@@ -12,7 +12,7 @@ pub( crate) struct FontVertex{
 
 impl FontVertex{
     pub fn get_mut_ptr(&mut self) -> *mut Self{
-        &mut self as *mut Self
+        self as *mut Self
     }
     pub unsafe fn from_mut_ptr(ptr: *mut Self) -> Self{
         *ptr
