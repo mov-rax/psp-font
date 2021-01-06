@@ -28,10 +28,11 @@ pub mod fontlib{
     use crate::fontlib::helper::{PGFFlags, FileType, UCS2};
     use smart_buffer;
     use smart_buffer::SmartBuffer;
-    use psp::sys::{sceGuGetMemory, sceGuScissor, sceKernelDcacheWritebackAll, sceGuClutMode, sceGuTexMode, sceGuEnable, sceGuTexImage, sceGuTexFunc, sceGuTexEnvColor, sceGuTexOffset, sceGuTexWrap, sceGuTexFilter, sceGuClutLoad, ClutPixelFormat, GuState, TexturePixelFormat, MipmapLevel, TextureEffect, TextureColorComponent, GuTexWrapMode, TextureFilter, sceKernelDcacheWritebackRange, sceGuDisable, sceGuDrawArray, GuPrimitive, VertexType};
+    use psp::sys::{sceGuGetMemory, sceGuScissor, sceKernelDcacheWritebackAll, sceGuClutMode, sceGuTexMode, sceGuEnable, sceGuTexImage, sceGuTexFunc, sceGuTexEnvColor, sceGuTexOffset, sceGuTexWrap, sceGuTexFilter, sceGuClutLoad, ClutPixelFormat, GuState, TexturePixelFormat, MipmapLevel, TextureEffect, TextureColorComponent, GuTexWrapMode, TextureFilter, sceKernelDcacheWritebackRange, sceGuDisable, sceGuDrawArray, GuPrimitive, VertexType, sceGuDebugPrint, sceGuInit};
     use psp::sys::{DisplayPixelFormat};
     use psp::Align16;
     use psp::sys::vfpu_context::MatrixSet;
+    use core::ffi::c_void;
 
 
     static mut CLUT: Align16<u16> = Align16(0); // Color Lookup Table
@@ -531,27 +532,30 @@ pub mod fontlib{
         fn activate(&self){
             dprintln!("About to activate psp-font...");
             unsafe {
-                dprintln!("sceGuClutMode");
+                sceGuInit();
+                sceGuDebugPrint(100,100, FontColor::WHITE.bits(), b"sceGuClutMode".as_ptr());
                 sceGuClutMode(ClutPixelFormat::Psm8888, 0, 255, 0);
-                dprintln!("sceGuClutLoad");
-                sceGuClutLoad(2, CLUT.0 as *mut u16 as *mut _);
-                dprintln!("sceGuEnable");
+                sceGuDebugPrint(100,100, FontColor::WHITE.bits(), b"sceGuClutLoad".as_ptr());
+                sceGuClutLoad(2, &CLUT.0 as *const u16 as *const c_void);
+                sceGuDebugPrint(100,100, FontColor::WHITE.bits(), b"sceGuEnable".as_ptr());
                 sceGuEnable(GuState::Texture2D);
-                dprintln!("sceGuTexMode");
+                sceGuDebugPrint(100,100, FontColor::WHITE.bits(), b"sceGuTexMode".as_ptr());
                 sceGuTexMode(TexturePixelFormat::PsmT4, 0, 0, if self.options.contains(PGFFlags::CACHE_ASCII) { 1 } else { 0 });
-                dprintln!("sceGuTexImage");
+                sceGuDebugPrint(100,100, FontColor::WHITE.bits(), b"sceGuTexImage".as_ptr());
                 sceGuTexImage(MipmapLevel::None, self.texture.width as i32, self.texture.width as i32, self.texture.width as i32, self.texture.get_data_raw_ptr() as *mut _);
-                dprintln!("sceGuTexFunc");
+                sceGuDebugPrint(100,100, FontColor::WHITE.bits(), b"sceGuTexFunc".as_ptr());
                 sceGuTexFunc(TextureEffect::Modulate, TextureColorComponent::Rgba);
-                dprintln!("sceGuTexEnvColor");
+                sceGuDebugPrint(100,100, FontColor::WHITE.bits(), b"sceGuTexEnvColor".as_ptr());
                 sceGuTexEnvColor(0x0);
-                dprintln!("sceGuTexOffset");
+                sceGuDebugPrint(100,100, FontColor::WHITE.bits(), b"sceGuTexOffset".as_ptr());
                 sceGuTexOffset(0.0, 0.0);
-                dprintln!("sceGuTexWrap");
+                sceGuDebugPrint(100,100, FontColor::WHITE.bits(), b"sceGuTexWrap".as_ptr());
                 sceGuTexWrap(GuTexWrapMode::Clamp, GuTexWrapMode::Clamp);
-                dprintln!("sceGuTexFilter");
+                sceGuDebugPrint(100,100, FontColor::WHITE.bits(), b"sceGuTexFilter".as_ptr());
                 sceGuTexFilter(TextureFilter::Linear, TextureFilter::Linear);
+                sceGuDebugPrint(100,100, FontColor::WHITE.bits(), b"psp-font activated".as_ptr());
             }
+
             dprintln!("psp-font activated.");
         }
 
