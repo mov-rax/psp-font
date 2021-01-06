@@ -2,8 +2,8 @@ use alloc::vec::Vec;
 use alloc::alloc::{alloc, dealloc, Layout};
 use core::mem::size_of;
 pub( crate) struct TextureData {
-    data: Option<*mut u8>, // raw bitmap data
-    layout: Option<Layout>,
+    pub(crate) data: Option<*mut u8>, // raw bitmap data
+    pub(crate) layout: Option<Layout>,
     pub(crate) id: u32,
     pub(crate) width: u32,
     pub(crate) height: u32,
@@ -72,21 +72,20 @@ impl TextureData{
                 let t_data = unsafe {alloc(layout)};
 
                 for i in 0..t_height{
-                    let mut block = ((t_data as usize + block_address) as *mut u32);
+                    let mut block = unsafe { t_data.offset(block_address as isize) as *mut u32};
                     for _ in 0..row_blocks{
                         unsafe {
                             for _ in 0..4{
                                 *block = *data as u32;
-                                block = (block as usize + 1) as *mut u32;
-                                data = (data as usize + 1) as *mut u8;
+                                *block += 1;
+                                *data  += 1;
                             }
-                            block = (block as usize + 28) as *mut u32;
+                            block = block.offset(28);
                         }
                     }
                     if i & 0x7 == 0x7{
                         block_address += row_blocks_add;
                     }
-                    block_address += 16;
                 }
 
                 unsafe {dealloc(self.data.unwrap(), self.layout.unwrap());}

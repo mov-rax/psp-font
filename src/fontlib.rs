@@ -764,7 +764,53 @@ pub mod fontlib{
         /// Swizzles the font textures for PSP usage :)
         fn swizzle(&mut self){
             dprintln!("About to swizzle font textures...");
-            self.texture.swizzle_texture(self.texture.height as usize, self.texture.width as usize);
+            let height = self.texture.height;
+            let byte_width = self.texture.width >> 1;
+            let texture_size = byte_width * height;
+
+            let row_blocks = byte_width >> 4;
+            let row_blocks_add = (row_blocks - 1) << 7;
+            let mut block_address = 0u32;
+            let src = self.texture.data.unwrap() as *mut u32;
+            let layout;
+            static mut TDATA:*mut u8 = core::ptr::null_mut(); // Actually null :? (but not for long!)
+            unsafe {
+                TDATA = {
+                    layout = Layout::from_size_align(texture_size as usize, 16).unwrap();
+                    alloc(layout)
+                }
+            }
+            if unsafe {TDATA == core::ptr::null_mut()}{
+                panic!("PSP-FONT: Could not allocate {} bytes for swizzling textures", texture_size);
+            }
+
+            for j in 0..height{
+                let mut block = unsafe {TDATA.offset(block_address as isize) as *mut u32};
+                for i in 0..row_blocks{
+                    for _ in 0..4{
+                        unsafe {
+                            *block = *src;
+                            *block += 1;
+                            *src += 1;
+                        }
+                    }
+                   unsafe {
+                       block.offset(28 as isize);
+                   }
+                }
+                if (j & 0x7) == 0x7{
+                    block_address += row_blocks_add;
+                }
+                block_address += 16; // Done here because in C it is j++, blockAddress += 16
+            }
+            unsafe {
+                dealloc(self.texture.data.unwrap(), self.texture.layout.unwrap()); // Have to free the memory first before replacing its value
+                self.texture.data = Some(TDATA); //replace previous pointer
+                self.texture.layout = Some(layout); //replace previous memory layout
+                self.options.insert(PGFFlags::CACHE_ASCII);
+            }
+
+            //self.texture.swizzle_texture(self.texture.height as usize, self.texture.width as usize);
             dprintln!("Font textures have been swizzled.");
             self.options.insert(PGFFlags::CACHE_ASCII);
         }
