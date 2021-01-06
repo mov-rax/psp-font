@@ -6,6 +6,7 @@ mod vertex;
 pub mod style;
 mod rotation;
 pub mod helper;
+pub mod debug;
 
 pub mod fontlib{
     use crate::fontlib::ccclib::Codepages as CP;
