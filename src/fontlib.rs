@@ -146,8 +146,6 @@ pub mod fontlib{
             let header = header.unwrap();
 
             let pgf_id = header.pgf_id.iter().collect::<String>();
-            psp::dprintln!("{}", &pgf_id);
-
             let filetype = if pgf_id == "PGF0"{ // could probably be more robust
                 FileType::PGF
             } else if data.len() == 1023372{
@@ -261,6 +259,7 @@ pub mod fontlib{
                     // All the data has been extracted from the file. Now, calculations must be done :)
 
                     if options.contains(PGFFlags::CACHE_ASCII){
+                        dprinln!("About to CACHE_ASCII...");
                         font.n_chars = 1; // assume there's at least one char
                         for i in 0..128{
                             if font.get_char_id(i) < 65535{
@@ -268,8 +267,11 @@ pub mod fontlib{
                             }
                         }
                         font.n_chars -= 1; // correct assumption
+                        dprintln!("CACHE_ASCII has been cached.");
                     }
+                    dprinln!("About to extract font glyphs...");
                     font.extract_font_glyphs();
+                    dprinln!("Font glyph extraction finished.");
                     font
                 },
                 FileType::BWFON => { // Not yet implemented
@@ -278,6 +280,7 @@ pub mod fontlib{
             };
 
             let omega = font;
+            dprinln!("About to return the font file!");
             omega
         }
 
@@ -526,6 +529,7 @@ pub mod fontlib{
 
         /// Does the sce function calls to activate the fonts
         fn activate(&self){
+            dprinln!("About to activate psp-font...");
             unsafe {
 
                 sceGuClutMode(ClutPixelFormat::Psm8888, 0, 255, 0);
@@ -539,7 +543,7 @@ pub mod fontlib{
                 sceGuTexWrap(GuTexWrapMode::Clamp, GuTexWrapMode::Clamp);
                 sceGuTexFilter(TextureFilter::Linear, TextureFilter::Linear);
             }
-
+            dprintln!("psp-font activated.");
         }
 
         /// Gets the bitmap data for a character with a given ID and glyph_type
@@ -759,11 +763,14 @@ pub mod fontlib{
 
         /// Swizzles the font textures for PSP usage :)
         fn swizzle(&mut self){
+            dprintln!("About to swizzle font textures...");
             self.texture.swizzle_texture(self.texture.height as usize, self.texture.width as usize);
+            dprinln!("Font textures have been swizzled.");
             self.options.insert(PGFFlags::CACHE_ASCII);
         }
 
         pub fn set_style(&mut self, style: FontStyle){
+            dprinln!("About to set style...");
             self.size = style.size;
             self.color = style.color;
             self.shadow_color = style.shadow_color;
@@ -784,10 +791,13 @@ pub mod fontlib{
             if (self.options & PGFFlags::WIDTH_MASK).bits() == 0{
                 self.options.insert(PGFFlags::from_bits((self.advance.0 as u32/ 8) & PGFFlags::WIDTH_MASK.bits()).unwrap());
             }
+            dprintln!("Style has been set");
         }
 
         pub fn print(&mut self, x: f32, y:f32, text: &str){
+            dprintln!("About to print...");
             self.print_column_ex(x,y,0.0,text);
+            dprintln!("print has finished.");
         }
 
         pub fn print_column_ex(&mut self, x: f32, y: f32, column: f32, text: &str){
