@@ -532,27 +532,27 @@ pub mod fontlib{
         fn activate(&self){
             dprintln!("About to activate psp-font...");
             unsafe {
-                sceIoWrite(psp::sys::SceUid(1), b"ClutMode".as_ptr() as *const _, 8);
+                sceIoWrite(psp::sys::SceUid(1), b"ClutMode\n".as_ptr() as *const _, 9);
                 sceGuClutMode(ClutPixelFormat::Psm8888, 0, 255, 0);
-                sceIoWrite(psp::sys::SceUid(1), b"ClutLoad".as_ptr() as *const _, 8);
+                sceIoWrite(psp::sys::SceUid(1), b"ClutLoad\n".as_ptr() as *const _, 9);
                 sceGuClutLoad(2, &CLUT.0 as *const u16 as *const c_void);
-                sceIoWrite(psp::sys::SceUid(1), b"ClutEnable".as_ptr() as *const _, 10);
+                sceIoWrite(psp::sys::SceUid(1), b"ClutEnable\n".as_ptr() as *const _, 11);
                 sceGuEnable(GuState::Texture2D);
-                sceIoWrite(psp::sys::SceUid(1), b"TexMode".as_ptr() as *const _, 7);
+                sceIoWrite(psp::sys::SceUid(1), b"TexMode\n".as_ptr() as *const _, 8);
                 sceGuTexMode(TexturePixelFormat::PsmT4, 0, 0, if self.options.contains(PGFFlags::CACHE_ASCII) { 1 } else { 0 });
-                sceIoWrite(psp::sys::SceUid(1), b"TexImage".as_ptr() as *const _, 8);
+                sceIoWrite(psp::sys::SceUid(1), b"TexImage\n".as_ptr() as *const _, 9);
                 sceGuTexImage(MipmapLevel::None, self.texture.width as i32, self.texture.width as i32, self.texture.width as i32, self.texture.get_data_raw_ptr() as *mut _);
-                sceIoWrite(psp::sys::SceUid(1), b"TexFunc".as_ptr() as *const _, 7);
+                sceIoWrite(psp::sys::SceUid(1), b"TexFunc\n".as_ptr() as *const _, 8);
                 sceGuTexFunc(TextureEffect::Modulate, TextureColorComponent::Rgba);
-                sceIoWrite(psp::sys::SceUid(1), b"EnvColor".as_ptr() as *const _, 8);
+                sceIoWrite(psp::sys::SceUid(1), b"EnvColor\n".as_ptr() as *const _, 9);
                 sceGuTexEnvColor(0x0);
-                sceIoWrite(psp::sys::SceUid(1), b"TexOffset".as_ptr() as *const _, 9);
+                sceIoWrite(psp::sys::SceUid(1), b"TexOffset\n".as_ptr() as *const _, 10);
                 sceGuTexOffset(0.0, 0.0);
-                sceIoWrite(psp::sys::SceUid(1), b"TexWrap".as_ptr() as *const _, 7);
+                sceIoWrite(psp::sys::SceUid(1), b"TexWrap\n".as_ptr() as *const _, 8);
                 sceGuTexWrap(GuTexWrapMode::Clamp, GuTexWrapMode::Clamp);
-                sceIoWrite(psp::sys::SceUid(1), b"TexFilter".as_ptr() as *const _, 9);
+                sceIoWrite(psp::sys::SceUid(1), b"TexFilter\n".as_ptr() as *const _, 10);
                 sceGuTexFilter(TextureFilter::Linear, TextureFilter::Linear);
-                sceIoWrite(psp::sys::SceUid(1), b"Done...".as_ptr() as *const _, 7);
+                sceIoWrite(psp::sys::SceUid(1), b"Done...\n".as_ptr() as *const _, 8);
             }
 
             dprintln!("psp-font activated.");
