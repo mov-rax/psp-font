@@ -259,7 +259,7 @@ pub mod fontlib{
                     // All the data has been extracted from the file. Now, calculations must be done :)
 
                     if options.contains(PGFFlags::CACHE_ASCII){
-                        dprinln!("About to CACHE_ASCII...");
+                        dprintln!("About to CACHE_ASCII...");
                         font.n_chars = 1; // assume there's at least one char
                         for i in 0..128{
                             if font.get_char_id(i) < 65535{
