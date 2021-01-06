@@ -35,7 +35,7 @@ pub mod fontlib{
     use core::ffi::c_void;
 
 
-    static mut CLUT: Align16<u16> = Align16(0); // Color Lookup Table
+    static mut CLUT: Align16<[u16;16]> = Align16([0u16;16]); // Color Lookup Table
 
     /// An internal structure that is used when reading a bitmap font file
     /// Similar to the PGF_Header struct in intrafont, however, this structure is not
@@ -140,6 +140,15 @@ pub mod fontlib{
 
     impl<'a> Font<'a>{
         pub fn new(data:&Vec<u8>, options: PGFFlags) -> Font{
+
+            unsafe{
+                if CLUT.0.iter().all(|a| *a == 0){ // if CLUT is not initialized, then initialize it...
+                    for n in 0..16u16{
+                        CLUT[n as usize] = ((n * 17) << 24) | 0xFFFFFFFF;
+                    }
+                }
+            }
+
             let header = PGFHeader::load_from_bytes(data);
             if let Err(_) = &header{
                 panic!("PSP-FONT: PGF Header of font file is invalid.");
@@ -522,7 +531,7 @@ pub mod fontlib{
             self.swizzle();
             unsafe {sceKernelDcacheWritebackAll()};
 
-            self.activate();
+            //self.activate();
             if ac{
                 self.options.insert(PGFFlags::CACHE_ASCII);
             }
