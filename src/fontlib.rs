@@ -144,7 +144,7 @@ pub mod fontlib{
             unsafe{
                 if CLUT.0.iter().all(|a| *a == 0){ // if CLUT is not initialized, then initialize it...
                     for n in 0..16u16{
-                        CLUT[n as usize] = ((n * 17) << 24) | 0xFFFFFFFF;
+                        CLUT.0[n as usize] = ((n * 17) << 24) | 0xFFFFFFFF;
                     }
                 }
             }
