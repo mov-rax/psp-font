@@ -269,9 +269,9 @@ pub mod fontlib{
                         font.n_chars -= 1; // correct assumption
                         dprintln!("CACHE_ASCII has been cached.");
                     }
-                    dprinln!("About to extract font glyphs...");
+                    dprintln!("About to extract font glyphs...");
                     font.extract_font_glyphs();
-                    dprinln!("Font glyph extraction finished.");
+                    dprintln!("Font glyph extraction finished.");
                     font
                 },
                 FileType::BWFON => { // Not yet implemented
@@ -280,7 +280,7 @@ pub mod fontlib{
             };
 
             let omega = font;
-            dprinln!("About to return the font file!");
+            dprintln!("About to return the font file!");
             omega
         }
 
@@ -529,7 +529,7 @@ pub mod fontlib{
 
         /// Does the sce function calls to activate the fonts
         fn activate(&self){
-            dprinln!("About to activate psp-font...");
+            dprintln!("About to activate psp-font...");
             unsafe {
 
                 sceGuClutMode(ClutPixelFormat::Psm8888, 0, 255, 0);
@@ -765,12 +765,12 @@ pub mod fontlib{
         fn swizzle(&mut self){
             dprintln!("About to swizzle font textures...");
             self.texture.swizzle_texture(self.texture.height as usize, self.texture.width as usize);
-            dprinln!("Font textures have been swizzled.");
+            dprintln!("Font textures have been swizzled.");
             self.options.insert(PGFFlags::CACHE_ASCII);
         }
 
         pub fn set_style(&mut self, style: FontStyle){
-            dprinln!("About to set style...");
+            dprintln!("About to set style...");
             self.size = style.size;
             self.color = style.color;
             self.shadow_color = style.shadow_color;
