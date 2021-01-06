@@ -531,16 +531,25 @@ pub mod fontlib{
         fn activate(&self){
             dprintln!("About to activate psp-font...");
             unsafe {
-
+                dprintln!("sceGuClutMode");
                 sceGuClutMode(ClutPixelFormat::Psm8888, 0, 255, 0);
+                dprintln!("sceGuClutLoad");
                 sceGuClutLoad(2, CLUT.0 as *mut u16 as *mut _);
+                dprintln!("sceGuEnable");
                 sceGuEnable(GuState::Texture2D);
+                dprintln!("sceGuTexMode");
                 sceGuTexMode(TexturePixelFormat::PsmT4, 0, 0, if self.options.contains(PGFFlags::CACHE_ASCII) { 1 } else { 0 });
+                dprintln!("sceGuTexImage");
                 sceGuTexImage(MipmapLevel::None, self.texture.width as i32, self.texture.width as i32, self.texture.width as i32, self.texture.get_data_raw_ptr() as *mut _);
+                dprintln!("sceGuTexFunc");
                 sceGuTexFunc(TextureEffect::Modulate, TextureColorComponent::Rgba);
+                dprintln!("sceGuTexEnvColor");
                 sceGuTexEnvColor(0x0);
+                dprintln!("sceGuTexOffset");
                 sceGuTexOffset(0.0, 0.0);
+                dprintln!("sceGuTexWrap");
                 sceGuTexWrap(GuTexWrapMode::Clamp, GuTexWrapMode::Clamp);
+                dprintln!("sceGuTexFilter");
                 sceGuTexFilter(TextureFilter::Linear, TextureFilter::Linear);
             }
             dprintln!("psp-font activated.");
