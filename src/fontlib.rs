@@ -14,13 +14,14 @@ pub mod fontlib{
     use byteorder::{LittleEndian, ByteOrder};
     use alloc::string::String;
     use alloc::alloc::{alloc, dealloc, Layout}; // unsafe but pretty useful
-    use core::mem::size_of;
+use core::mem::size_of;
     use crate::fontlib::texture::TextureData;
     use crate::fontlib::char_map::CharmapData;
     use crate::fontlib::glyph::{Glyph, GlyphBW};
     use crate::fontlib::vertex::FontVertex;
     use crate::fontlib::fontlib::FileType::{PGF, BWFON};
     use crate::fontlib::style::{FontColor, FontStyle};
+    use crate::fontlib::debug::io_write;
     use alloc::vec::Vec;
     use alloc::boxed::Box;
     use core::ops::Shl;
@@ -42,21 +43,21 @@ pub mod fontlib{
     /// Similar to the PGF_Header struct in intrafont, however, this structure is not
     /// loaded with the raw data from reading the file, it is safely read.
     pub struct PGFHeader{       // TYPICAL VALUES FOR THE DATA
-        header_start:u16,   // 0
-        header_len:u16,     // 392 or 412
-        pgf_id:[char;4],    // "PGF0"
-        revision:u32,       // 2 or 3
-        version:u32,        // 6
-        charmap_len:u32,    // MAX: 65536   (number of char-glyphs in fontdata)
-        charptr_len:u32,    // MAX: 512     (number of elements in char_pointer_table)
-        charmap_bpe:u32,    //              (number of bits per element in charmap)
-        charptr_bpe:u32,    //              (number of bits per element in char_pointer_table)
-        family:[char;64],   // "Comic Sans" (the font name/family)
-        style:[char;64],    // "Bold"       (the font type/style)
-        charmap_min:u16,    //              (first element in charmap)
-        charmap_max:u16,    //              (last element in charmap)
-        advance:(u32,u32),  // (max x-advance, max y-advance)
-        dimension_table_len:u8,
+    header_start:u16,   // 0
+    header_len:u16,     // 392 or 412
+    pgf_id:[char;4],    // "PGF0"
+    revision:u32,       // 2 or 3
+    version:u32,        // 6
+    charmap_len:u32,    // MAX: 65536   (number of char-glyphs in fontdata)
+    charptr_len:u32,    // MAX: 512     (number of elements in char_pointer_table)
+    charmap_bpe:u32,    //              (number of bits per element in charmap)
+    charptr_bpe:u32,    //              (number of bits per element in char_pointer_table)
+    family:[char;64],   // "Comic Sans" (the font name/family)
+    style:[char;64],    // "Bold"       (the font type/style)
+    charmap_min:u16,    //              (first element in charmap)
+    charmap_max:u16,    //              (last element in charmap)
+    advance:(u32,u32),  // (max x-advance, max y-advance)
+    dimension_table_len:u8,
         adjust_table_len:(u8,u8), // (x-adjust-table-len, y-adjust-table-len)
         advance_table_len:u8,
         shadowmap_len:u32,  // MAX: 512     (number of elements in shadow_charmap (number of shadow-glyphs in fontdata))
@@ -145,7 +146,7 @@ pub mod fontlib{
             unsafe{
                 if CLUT.0.iter().all(|a| *a == 0){ // if CLUT is not initialized, then initialize it...
                     for n in 0..16u16{
-                        CLUT.0[n as usize] = ((n * 17) << 24) | 0xFFFFFFFF;
+                        CLUT.0[n as usize] = ((((n * 17) as u64) << 24) as u32 | 0xFFFFFF) as u16;
                     }
                 }
             }
@@ -155,7 +156,6 @@ pub mod fontlib{
                 panic!("PSP-FONT: PGF Header of font file is invalid.");
             }
             let header = header.unwrap();
-
             let pgf_id = header.pgf_id.iter().collect::<String>();
             let filetype = if pgf_id == "PGF0"{ // could probably be more robust
                 FileType::PGF
@@ -392,7 +392,7 @@ pub mod fontlib{
             self.charmap_data.char_ptr_table.clear();
             self.charmap_data.shadow_charmap.clear();
 
-            // sceKernelDcacheWWritebackAll()
+            unsafe {sceKernelDcacheWritebackAll()};
 
             if self.options.contains(PGFFlags::CACHE_ASCII) && (y + y_size + 1 <= self.texture.height){ // work-around for cache (not CACHE_ASCII like in C)
                 // cache it!!!
@@ -516,7 +516,7 @@ pub mod fontlib{
                     self.texture.y_size = self.shadow_glyphs[i].height as u16;
                 }
                 if self.texture.y < y{
-                    return; // char did not into cache -> abort precache (should reset cache and glyph.flags)
+                    return; // char did not fit into cache -> abort precache (should reset cache and glyph.flags)
                 }
             }
 
@@ -532,14 +532,21 @@ pub mod fontlib{
             self.swizzle();
             unsafe {sceKernelDcacheWritebackAll()};
 
-            //self.activate();
             if ac{
                 self.options.insert(PGFFlags::CACHE_ASCII);
             }
         }
 
+        fn debug_f(x:f32){
+            if x >= 0.0{
+                io_write("OK\n");
+            } else {
+                io_write("BAD\n");
+            }
+        }
+
         /// Does the sce function calls to activate the fonts
-        fn activate(&self){
+        fn activate(&mut self){
             dprintln!("About to activate psp-font...");
             unsafe {
                 sceIoWrite(psp::sys::SceUid(1), b"ClutMode\n".as_ptr() as *const _, 9);
@@ -591,14 +598,14 @@ pub mod fontlib{
 
             } else { // Filetype BWFON
 
-               if glyph_type.contains(PGFFlags::CHAR_GLYPH){
-                   glyph = self.glyphs[0];
-                   glyph.flags = self.glyphs_bw[id].flags | PGFFlags::BMP_HORIZONTAL_ROWS;
-                   glyph_flags.insert(PGFFlags::CHAR_GLYPH);
-               } else {
-                   glyph = self.shadow_glyphs[0];
-                   glyph_flags.insert(PGFFlags::SHADOWGLYPH);
-               }
+                if glyph_type.contains(PGFFlags::CHAR_GLYPH){
+                    glyph = self.glyphs[0];
+                    glyph.flags = self.glyphs_bw[id].flags | PGFFlags::BMP_HORIZONTAL_ROWS;
+                    glyph_flags.insert(PGFFlags::CHAR_GLYPH);
+                } else {
+                    glyph = self.shadow_glyphs[0];
+                    glyph_flags.insert(PGFFlags::SHADOWGLYPH);
+                }
                 glyph.offset = id as u32 * 36; // 36 bytes/char
             }
 
@@ -783,61 +790,46 @@ pub mod fontlib{
             true // returns true if all went swell and the bmp was cached
         }
 
-        /// Swizzles the font textures for PSP usage :)
+        /// Swizzles the font for PSP usage :)
         fn swizzle(&mut self){
-            dprintln!("About to swizzle font textures...");
+            use aligned_utils;
+            io_write("SWIZZLING TEXTURES\n");
             let height = self.texture.height;
             let byte_width = self.texture.width >> 1;
             let texture_size = byte_width * height;
 
             let row_blocks = byte_width >> 4;
             let row_blocks_add = (row_blocks - 1) << 7;
-            let mut block_address = 0u32;
-            let src = self.texture.data.unwrap() as *mut u32;
-            let layout;
-            static mut TDATA:*mut u8 = core::ptr::null_mut(); // Actually null :? (but not for long!)
-            unsafe {
-                TDATA = {
-                    layout = Layout::from_size_align(texture_size as usize, 16).unwrap();
-                    alloc(layout)
-                }
-            }
-            if unsafe {TDATA == core::ptr::null_mut()}{
-                panic!("PSP-FONT: Could not allocate {} bytes for swizzling textures", texture_size);
-            }
+            let mut block_address = 0;
+            let mut src_offset:usize = 0;
+            let mut block_offset:usize = 0;
+            let mut t_data = aligned_utils::bytes::AlignedBytes::new_zeroed(texture_size as usize, 16);
 
             for j in 0..height{
-                let mut block = unsafe {TDATA.offset(block_address as isize) as *mut u32};
-                for i in 0..row_blocks{
+                for _ in 0..row_blocks{
                     for _ in 0..4{
-                        unsafe {
-                            *block = *src;
-                            *block += 1;
-                            *src += 1;
-                        }
+                        let temp_data = byteorder::NativeEndian::read_u32(&mut (*self.texture.data)[src_offset*size_of::<u32>()..]);
+                        byteorder::NativeEndian::write_u32(&mut (*t_data)[block_address+(block_offset*size_of::<u32>())..], temp_data);
+                        block_offset += 1;
+                        src_offset += 1;
                     }
-                   unsafe {
-                       block.offset(28 as isize);
-                   }
+                    block_offset += 28;
                 }
+
                 if (j & 0x7) == 0x7{
-                    block_address += row_blocks_add;
+                    block_address += row_blocks_add as usize;
                 }
-                block_address += 16; // Done here because in C it is j++, blockAddress += 16
-            }
-            unsafe {
-                dealloc(self.texture.data.unwrap(), self.texture.layout.unwrap()); // Have to free the memory first before replacing its value
-                self.texture.data = Some(TDATA); //replace previous pointer
-                self.texture.layout = Some(layout); //replace previous memory layout
-                self.options.insert(PGFFlags::CACHE_ASCII);
+                block_offset = 0;
+                block_address += 16;
             }
 
-            //self.texture.swizzle_texture(self.texture.height as usize, self.texture.width as usize);
-            dprintln!("Font textures have been swizzled.");
-            self.options.insert(PGFFlags::CACHE_ASCII);
+            self.texture.data = t_data;
+            self.options |= PGFFlags::CACHE_ASCII;
+            io_write("TEXTURES SWIZZLED\n");
         }
 
         pub fn set_style(&mut self, style: FontStyle){
+
             dprintln!("About to set style...");
             self.size = style.size;
             self.color = style.color;
@@ -862,18 +854,29 @@ pub mod fontlib{
             dprintln!("Style has been set");
         }
 
-        pub fn print(&mut self, x: f32, y:f32, text: &str){
-            dprintln!("About to print...");
-            self.print_column_ex(x,y,0.0,text);
-            dprintln!("print has finished.");
+        pub fn print(&mut self, x: f32, y:f32, text: &str) -> f32{
+            return self.print_column_ex(x,y,0.0f32,text, text.len() as i32)
         }
 
-        pub fn print_column_ex(&mut self, x: f32, y: f32, column: f32, text: &str){
-            if text.len() <= 0 { return }
+        pub fn print_column_ex(&mut self, mut x: f32, y: f32, mut column: f32, text: &str, length: i32) -> f32{
 
-            let mut buffer = buf!(0, 64, text.len()); // A hybrid stack/heap buffer
-            Self::encode(text, &mut buffer); // Encodes UTF-8 text to UCS2
+            //column = 0.0;
 
+            if text.len() <= 0 || length <= 0
+            {
+                return x
+            }
+            // let mut buffer = buf!(0u16, 64, length as usize); <--- Causes Errors!!
+            // let mut buffer = SmartBuffer::<u16, 64>::new(0, length as usize); // A hybrid stack/heap buffer
+            // Self::encode(text, &mut buffer); // Encodes UTF-8 text to UCS2
+            //
+            if column < 0.0{
+                // for some reason, 0.0 is being detected as less than 0.0, therefore this is in place to get it working again...
+            }
+
+
+            io_write(format!("OPTIONS: {:X}\n", self.options).as_str());
+            //
             if self.options.contains(PGFFlags::SCROLL_LEFT){
                 for i in 0..text.len(){
                     if buffer[i] == '\n' as u16{
@@ -883,12 +886,14 @@ pub mod fontlib{
             }
 
             if column >= 0.0{
-                let length = buffer.get_size();
-                self.print_column_ucs2_ex(x,y,column,buffer, 0, length);
+                io_write("EQUAL TO\n");
+                //x = self.print_column_ucs2_ex(x,y,column,buffer, 0, length as usize);
             } else {
-
+                io_write("It did not print column\n");
+                io_write(format!("The column size is {}\n", column).as_str());
+                //x = self.measure_text_ucs2_ex(&buffer, 0, buffer.get_size() as i32);
             }
-
+            return x;
         }
 
         fn measure_text_ucs2_ex<const M: usize>(&mut self, text: &SmartBuffer<u16, M>, offset:usize,  length: i32) -> f32{
