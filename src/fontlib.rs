@@ -30,14 +30,19 @@ use core::mem::size_of;
     use crate::fontlib::helper::{PGFFlags, FileType, UCS2};
     use smart_buffer;
     use smart_buffer::SmartBuffer;
-    use psp::sys::{sceGuGetMemory, sceGuScissor, sceKernelDcacheWritebackAll, sceGuClutMode, sceGuTexMode, sceGuEnable, sceGuTexImage, sceGuTexFunc, sceGuTexEnvColor, sceGuTexOffset, sceGuTexWrap, sceGuTexFilter, sceGuClutLoad, ClutPixelFormat, GuState, TexturePixelFormat, MipmapLevel, TextureEffect, TextureColorComponent, GuTexWrapMode, TextureFilter, sceKernelDcacheWritebackRange, sceGuDisable, sceGuDrawArray, GuPrimitive, VertexType, sceGuDebugPrint, sceGuInit, sceGuDebugFlush, sceIoWrite};
+    use psp::sys::{sceGuGetMemory, sceGuScissor, sceKernelDcacheWritebackAll, sceGuClutMode, sceGuTexMode, sceGuEnable, sceGuTexImage, sceGuTexFunc, sceGuTexEnvColor, sceGuTexOffset, sceGuTexWrap, sceGuTexFilter, sceGuClutLoad, ClutPixelFormat, GuState, TexturePixelFormat, MipmapLevel, TextureEffect, TextureColorComponent, GuTexWrapMode, TextureFilter, sceKernelDcacheWritebackRange, sceGuDisable, sceGuDrawArray, GuPrimitive, VertexType, sceGuDebugPrint, sceGuInit, sceGuDebugFlush, sceIoWrite, sceGuStart, GuContextType, sceKernelCreateThread, sceKernelCreateCallback, SceKernelCallbackFunction, SceKernelThreadEntry, ThreadAttributes, SceKernelThreadOptParam, sceKernelRegisterExitCallback, sceKernelSleepThreadCB, sceKernelStartThread, SceUid, sceGumMatrixMode, MatrixMode, sceGumLoadIdentity, sceGumPerspective, sceGuClearColor, sceGuClearDepth, sceGuClear, ClearBuffer, sceGuDrawBuffer, sceGuDispBuffer, sceGuDepthBuffer, sceGuOffset, sceGuViewport, sceGuDepthRange, sceGuDepthFunc, DepthFunc, sceGuFrontFace, FrontFaceDirection, sceGuShadeModel, ShadingModel, sceGuBlendFunc, BlendOp, BlendFactor, sceGuFinish, sceGuSync, GuSyncMode, GuSyncBehavior, sceDisplayWaitVblankStart, sceGuDisplay, sceGuSwapBuffers};
     use psp::sys::{DisplayPixelFormat};
     use psp::Align16;
     use psp::sys::vfpu_context::MatrixSet;
     use core::ffi::c_void;
+    use psp::vram_alloc::get_vram_allocator;
+    use alloc::rc::Rc;
+    use bitflags::_core::ops::{Deref, DerefMut};
 
 
     static mut CLUT: Align16<[u16;16]> = Align16([0u16;16]); // Color Lookup Table
+static mut LIST: Align16<[u32;0x40000]> = Align16([0u32;0x40000]); // Gu List
+static mut RUNNING:bool = false; // Callback
 
     /// An internal structure that is used when reading a bitmap font file
     /// Similar to the PGF_Header struct in intrafont, however, this structure is not
@@ -114,6 +119,137 @@ use core::mem::size_of;
             Ok(PGFHeader{ header_start, header_len, pgf_id, revision, version, charmap_len, charptr_len, charmap_bpe, charptr_bpe, family,
                 style, charmap_min, charmap_max, advance, dimension_table_len, adjust_table_len, advance_table_len, shadowmap_len, shadowmap_bpe, shadowscale
             })
+        }
+    }
+
+    pub struct FontController<'a>{
+        font: Font<'a>,
+    }
+
+    impl<'a> FontController<'a>{
+
+        /// Creates a FontController that contains a Font.
+        ///
+        /// A FontController is a wrapper used to easily set up a Font.
+        pub fn new(data:&'a Vec<u8>, options: PGFFlags) -> Self{
+            let font = Font::new(data, options);
+            Self::sce_init();
+            Self { font }
+        }
+
+        /// Runs draw each frame until it returns `false`.
+        pub fn run<T>(&mut self, mut draw: T)
+            where T: FnMut(&mut Font) -> bool,
+        {
+            loop {
+                unsafe {
+                    sceGumMatrixMode(MatrixMode::Projection);
+                    sceGumLoadIdentity();
+                    sceGumPerspective(75.0, 16.0/9.0, 0.5, 1000.0);
+                    sceGumMatrixMode(MatrixMode::View);
+                    sceGumLoadIdentity();
+                    sceGumMatrixMode(MatrixMode::Model);
+                    sceGumLoadIdentity();
+
+                    sceGuClearColor(FontColor::GRAY.bits());
+                    sceGuClearDepth(0);
+                    sceGuClear(ClearBuffer::COLOR_BUFFER_BIT | ClearBuffer::DEPTH_BUFFER_BIT);
+                }
+
+                let result = draw(&mut self.font);
+
+                unsafe {
+                    // end drawing
+                    sceGuFinish();
+                    sceGuSync(GuSyncMode::Finish, GuSyncBehavior::Wait);
+
+                    // swap buffers (waiting for vsync)
+                    sceDisplayWaitVblankStart();
+                    sceGuSwapBuffers();
+                }
+
+                if !result{
+                    break; // if the drawing function returns false then stop the loop
+                }
+            }
+        }
+
+        extern "C" fn exit_callback(arg1: i32, arg2: i32, common: *mut c_void) -> i32{
+            unsafe {
+                RUNNING = false;
+            }
+            0
+        }
+
+
+        extern "C" fn callback_thread(args: usize, argp: *mut c_void) -> i32{
+            unsafe {
+                let func:SceKernelCallbackFunction = Self::exit_callback;
+                let cbid = sceKernelCreateCallback(b"Exit Callback".as_ptr(), func, core::ptr::null_mut() as *mut _);
+                sceKernelRegisterExitCallback(cbid);
+                sceKernelSleepThreadCB();
+            }
+            0
+        }
+
+        fn setup_callbacks() -> SceUid{
+            unsafe {
+                let func:SceKernelThreadEntry = Self::callback_thread;
+                let thid = sceKernelCreateThread(b"CallbackThread".as_ptr(), func, 0x11, 0xFA0, ThreadAttributes::USER, 0 as *mut _);
+                if thid.0 >= 0{
+                    sceKernelStartThread(thid, 0, 0 as *mut _);
+                }
+                thid
+            }
+        }
+
+        /// A pre-baked initialization for sceGu*
+        pub fn sce_init(){
+            use psp::{SCREEN_HEIGHT, SCREEN_WIDTH, BUF_WIDTH};
+            Self::setup_callbacks();
+
+            // Init GU
+            unsafe {
+                sceGuInit();
+                sceGuStart(GuContextType::Direct, &mut LIST.0 as *mut [u32; 0x40000] as *mut _ );
+
+                sceGuDrawBuffer(DisplayPixelFormat::Psm8888, core::ptr::null_mut(), BUF_WIDTH as i32);
+                sceGuDispBuffer(SCREEN_WIDTH as i32, SCREEN_HEIGHT as i32, 0x88000 as *mut _, BUF_WIDTH as i32);
+                sceGuDepthBuffer(0x110000 as *mut _, psp::BUF_WIDTH as i32);
+
+                sceGuOffset(2048 - (SCREEN_WIDTH / 2), 2048 - (SCREEN_HEIGHT / 2));
+                sceGuViewport(2048, 2048, SCREEN_WIDTH as i32, SCREEN_HEIGHT as i32);
+                sceGuDepthRange(65535, 0);
+                sceGuScissor(0,0, SCREEN_WIDTH as i32, SCREEN_HEIGHT as i32);
+                sceGuEnable(GuState::ScissorTest);
+                sceGuDepthFunc(DepthFunc::GreaterOrEqual);
+                sceGuEnable(GuState::DepthTest);
+                sceGuFrontFace(FrontFaceDirection::Clockwise);
+                sceGuShadeModel(ShadingModel::Smooth);
+                sceGuEnable(GuState::CullFace);
+                sceGuEnable(GuState::ClipPlanes);
+                sceGuEnable(GuState::Blend);
+                sceGuBlendFunc(BlendOp::Add, BlendFactor::SrcAlpha, BlendFactor::OneMinusSrcAlpha, 0, 0);
+                sceGuFinish();
+                sceGuSync(GuSyncMode::Finish, GuSyncBehavior::Wait);
+
+                sceDisplayWaitVblankStart();
+                sceGuDisplay(true);
+            }
+        }
+    }
+
+    impl<'a> Deref for FontController<'a>{
+        type Target = Font<'a>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.font
+        }
+    }
+
+    impl<'a> DerefMut for FontController<'a>{
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.font
         }
     }
 
@@ -270,7 +406,6 @@ use core::mem::size_of;
                     // All the data has been extracted from the file. Now, calculations must be done :)
 
                     if options.contains(PGFFlags::CACHE_ASCII){
-                        dprintln!("About to CACHE_ASCII...");
                         font.n_chars = 1; // assume there's at least one char
                         for i in 0..128{
                             if font.get_char_id(i) < 65535{
@@ -278,11 +413,8 @@ use core::mem::size_of;
                             }
                         }
                         font.n_chars -= 1; // correct assumption
-                        dprintln!("CACHE_ASCII has been cached.");
                     }
-                    dprintln!("About to extract font glyphs...");
                     font.extract_font_glyphs();
-                    dprintln!("Font glyph extraction finished.");
                     font
                 },
                 FileType::BWFON => { // Not yet implemented
@@ -291,7 +423,6 @@ use core::mem::size_of;
             };
 
             let omega = font;
-            dprintln!("About to return the font file!");
             omega
         }
 
@@ -545,34 +676,44 @@ use core::mem::size_of;
             }
         }
 
+
+
+        // /// The draw function that will be called every time the display is updated
+        // pub fn draw<T>(&mut self, func: T)
+        // where T: FnMut(&mut Self)
+        // {
+        //
+        // }
+
+
         /// Does the sce function calls to activate the fonts
         fn activate(&mut self){
-            dprintln!("About to activate psp-font...");
+            io_write("Activating PSP-FONT...");
+            io_write("PSP-FONT ACTIVATION SEQUENCE...\n");
             unsafe {
-                sceIoWrite(psp::sys::SceUid(1), b"ClutMode\n".as_ptr() as *const _, 9);
+                sceGuInit();
+                io_write("ClutMode\n");
                 sceGuClutMode(ClutPixelFormat::Psm8888, 0, 255, 0);
-                sceIoWrite(psp::sys::SceUid(1), b"ClutLoad\n".as_ptr() as *const _, 9);
+                io_write("ClutLoad\n");
                 sceGuClutLoad(2, &CLUT.0 as *const u16 as *const c_void);
-                sceIoWrite(psp::sys::SceUid(1), b"ClutEnable\n".as_ptr() as *const _, 11);
+                io_write("ClutEnable\n");
                 sceGuEnable(GuState::Texture2D);
-                sceIoWrite(psp::sys::SceUid(1), b"TexMode\n".as_ptr() as *const _, 8);
+                io_write("TexMode\n");
                 sceGuTexMode(TexturePixelFormat::PsmT4, 0, 0, if self.options.contains(PGFFlags::CACHE_ASCII) { 1 } else { 0 });
-                sceIoWrite(psp::sys::SceUid(1), b"TexImage\n".as_ptr() as *const _, 9);
+                io_write("TexImage\n");
                 sceGuTexImage(MipmapLevel::None, self.texture.width as i32, self.texture.width as i32, self.texture.width as i32, self.texture.get_data_raw_ptr() as *mut _);
-                sceIoWrite(psp::sys::SceUid(1), b"TexFunc\n".as_ptr() as *const _, 8);
+                io_write("TexFunc\n");
                 sceGuTexFunc(TextureEffect::Modulate, TextureColorComponent::Rgba);
-                sceIoWrite(psp::sys::SceUid(1), b"EnvColor\n".as_ptr() as *const _, 9);
+                io_write("EnvColor\n");
                 sceGuTexEnvColor(0x0);
-                sceIoWrite(psp::sys::SceUid(1), b"TexOffset\n".as_ptr() as *const _, 10);
+                io_write("Offset\n");
                 sceGuTexOffset(0.0, 0.0);
-                sceIoWrite(psp::sys::SceUid(1), b"TexWrap\n".as_ptr() as *const _, 8);
+                io_write("TexWrap\n");
                 sceGuTexWrap(GuTexWrapMode::Clamp, GuTexWrapMode::Clamp);
-                sceIoWrite(psp::sys::SceUid(1), b"TexFilter\n".as_ptr() as *const _, 10);
+                io_write("TexFilter\n");
                 sceGuTexFilter(TextureFilter::Linear, TextureFilter::Linear);
-                sceIoWrite(psp::sys::SceUid(1), b"Done...\n".as_ptr() as *const _, 8);
             }
-
-            dprintln!("psp-font activated.");
+            io_write("PSP-FONT ACTIVATION SEQUENCE COMPLETE\n");
         }
 
         /// Gets the bitmap data for a character with a given ID and glyph_type
@@ -830,7 +971,6 @@ use core::mem::size_of;
 
         pub fn set_style(&mut self, style: FontStyle){
 
-            dprintln!("About to set style...");
             self.size = style.size;
             self.color = style.color;
             self.shadow_color = style.shadow_color;
@@ -851,7 +991,6 @@ use core::mem::size_of;
             if (self.options & PGFFlags::WIDTH_MASK).bits() == 0{
                 self.options.insert(PGFFlags::from_bits((self.advance.0 as u32/ 8) & PGFFlags::WIDTH_MASK.bits()).unwrap());
             }
-            dprintln!("Style has been set");
         }
 
         pub fn print(&mut self, x: f32, y:f32, text: &str) -> f32{
@@ -860,23 +999,16 @@ use core::mem::size_of;
 
         pub fn print_column_ex(&mut self, mut x: f32, y: f32, mut column: f32, text: &str, length: i32) -> f32{
 
-            //column = 0.0;
-
             if text.len() <= 0 || length <= 0
             {
                 return x
             }
-            // let mut buffer = buf!(0u16, 64, length as usize); <--- Causes Errors!!
-            // let mut buffer = SmartBuffer::<u16, 64>::new(0, length as usize); // A hybrid stack/heap buffer
-            // Self::encode(text, &mut buffer); // Encodes UTF-8 text to UCS2
-            //
-            if column < 0.0{
-                // for some reason, 0.0 is being detected as less than 0.0, therefore this is in place to get it working again...
-            }
-
+            //let mut buffer = buf!(0u16, 64, length as usize); <--- Causes Errors!!
+            let mut buffer = SmartBuffer::<u16, 64>::new(0, length as usize); // A hybrid stack/heap buffer
+            Self::encode(text, &mut buffer); // Encodes UTF-8 text to UCS2
 
             io_write(format!("OPTIONS: {:X}\n", self.options).as_str());
-            //
+
             if self.options.contains(PGFFlags::SCROLL_LEFT){
                 for i in 0..text.len(){
                     if buffer[i] == '\n' as u16{
@@ -884,14 +1016,14 @@ use core::mem::size_of;
                     }
                 }
             }
-
+            column = 0.0;
             if column >= 0.0{
-                io_write("EQUAL TO\n");
-                //x = self.print_column_ucs2_ex(x,y,column,buffer, 0, length as usize);
+                io_write("PRINTING\n");
+                x = self.print_column_ucs2_ex(x,y,column,buffer, 0, length as usize);
             } else {
                 io_write("It did not print column\n");
                 io_write(format!("The column size is {}\n", column).as_str());
-                //x = self.measure_text_ucs2_ex(&buffer, 0, buffer.get_size() as i32);
+                x = self.measure_text_ucs2_ex(&buffer, 0, buffer.get_size() as i32);
             }
             return x;
         }
@@ -916,7 +1048,7 @@ use core::mem::size_of;
                     };
                 } else {
                     if let Some(font) = &mut *self.alt_font{
-                        //x += font.measure_text_ucs2_ex() -- CANNOT CURRENTLY IMPLEMENT THIS C CODE IN RUST :( --TODO: Implement this somehow
+                        //x += font.measure_text_ucs2_ex()
                     }
                 }
             }
@@ -956,6 +1088,8 @@ use core::mem::size_of;
             let (mut j, mut n_glyphs, mut last_n_glyphs, mut n_sglyphs, mut changed, mut count) = (0,0,0,0,false,0);
             let (mut char_id, mut subucs2, mut glyph_id, mut glyph_ptr, mut shadow_glyph_ptr) = (0,0u16,0,0,0);
 
+            io_write("About to count number of glyphs to draw...\n");
+            io_write(format!("Number of glyphs to draw: {}\n", length).as_str());
             // count number of glyphs to draw and cache BMPs
             loop {
                 changed = false;
@@ -1039,13 +1173,17 @@ use core::mem::size_of;
                     break;
                 } // No do-while loops in rust, but we can do loop-if loops :)
             }
+            io_write("Counted the number of glyphs to draw!\n");
             // Now comes a lot of psp-specific code.
             // This is a pointer to GPU memory. It is very nice for storing data that has to be displayed on screens :).
-            let mut v = unsafe { (sceGuGetMemory(if self.rotation.is_rotated { 6 } else { 2 } * (n_glyphs as i32 + n_sglyphs as i32) * size_of::<FontVertex>() as i32) as *mut FontVertex)};
-
+            let mut allocator = get_vram_allocator().unwrap();
+            let mut v = allocator.alloc_sized::<FontVertex>(if self.rotation.is_rotated { 6 } else { 2 } * (n_glyphs as u32 + n_sglyphs as u32));
+            let mut v = v.as_mut_ptr_direct_to_vram() as *mut FontVertex;
+            io_write("GOT VRAM MEMORY!\n");
             let mut s_index = 0;
             let mut c_index = n_sglyphs;
             let mut last_c_index = n_sglyphs; // index for shadow and character/overlay glyphs
+            io_write("Doing maths and drawing glyphs onto the screen!\n");
             for i in 0..length{
                 // calculate left, height and possibly fill for character placement
                 if (i == 0) || (text[i+offset] == '\n' as u16) || ((column > 0.0) && (i >= eol as usize) && (text[i+offset] != 32)){
@@ -1440,7 +1578,9 @@ use core::mem::size_of;
 
             // finalize and activate texture (if not already active or ahs been changed)
             unsafe {
+                io_write("ABOUT TO DRAW!\n");
                 sceKernelDcacheWritebackRange(v as *mut _, (n_glyphs + n_sglyphs) as u32 * size_of::<FontVertex>() as u32); // SAKYA, mrneo240 <-- from C version Intrafont
+                io_write("");
                 if !self.options.contains(PGFFlags::ACTIVE){
                     self.activate(); // And then, there was light...
                 }
@@ -1452,6 +1592,7 @@ use core::mem::size_of;
                                core::ptr::null(),
                                v.offset((n_sglyphs as u32 * if self.rotation.is_rotated { 6 } else { 2 }) as isize) as *mut _ );
                 sceGuEnable(GuState::DepthTest);
+                io_write("DRAWING COMPLETE\n");
             }
 
             if scroll == 1{
